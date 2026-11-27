@@ -424,7 +424,7 @@ function cv(n){return getComputedStyle(document.documentElement).getPropertyValu
 function brl(x){return 'R$ '+Math.round(x).toLocaleString('pt-BR');}
 function el(id){return document.getElementById(id);}
 function calc(){
-  var renda=+el('renda').value||0, taxa=(+el('taxa').value||0)/100, meta=+el('meta').value||0, meses=+el('meses').value;
+  var renda=(+el('renda').value||0)+(window.extraRenda?window.extraRenda():0), taxa=(+el('taxa').value||0)/100, meta=+el('meta').value||0, meses=+el('meses').value;
   el('mesesOut').textContent=meses+(meses===1?' mês':' meses');
   var atual=0, novo=0;
   cats.forEach(function(c,i){
@@ -1102,7 +1102,7 @@ el('cfNome').value=myName;
 el('cfNome').oninput=function(){sincNome(this.value,'cf');};
 el('cNome').addEventListener('input',function(){sincNome(this.value,'c');});
 el('btBackup').onclick=function(){
-  var m=el('cfMsg'),docs=[].concat(gastos,cartoes,compras,metas,deps,extras);
+  var m=el('cfMsg'),docs=[].concat(gastos,cartoes,compras,metas,deps,extras,window.receitas||[]);
   var txt=JSON.stringify(docs);
   try{navigator.clipboard.writeText(txt).then(function(){m.className='msg';m.textContent='Backup copiado ('+docs.length+' itens). Guarde em um lugar seguro.';},function(){m.className='msg err';m.textContent='Não consegui copiar.';});}
   catch(e){m.className='msg err';m.textContent='Não consegui copiar.';}
@@ -1111,7 +1111,7 @@ el('btRest').onclick=async function(){
   var m=el('cfMsg'),arr;
   try{arr=JSON.parse(el('cfRest').value);}catch(e){arr=null;}
   if(!Array.isArray(arr)){m.className='msg err';m.textContent='Cole o backup completo que você copiou antes.';return;}
-  var ok=arr.filter(function(o){return o&&typeof o.id==='string'&&/^[gckmox]\d+/.test(o.id);}),n=0;
+  var ok=arr.filter(function(o){return o&&typeof o.id==='string'&&/^[gckmorx]\d+/.test(o.id);}),n=0;
   for(var i=0;i<ok.length;i++){try{await saveDoc(ok[i]);n++;}catch(e){}}
   m.className='msg';m.textContent=n+' itens restaurados.';el('cfRest').value='';
 };
@@ -1476,5 +1476,5 @@ el('btXtRenda').onclick=function(){
   m.className='msg';m.textContent='Renda do simulador ajustada para '+brl2(t)+'.';
 };
 </script>
-<script src="g360-download.js"></script></body>
+<script src="g360-download.js"></script><script src="g360-receitas.js"></script></body>
 </html>
