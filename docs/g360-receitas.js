@@ -4,8 +4,10 @@
   var _split=window.splitAll;
   window.splitAll=function(all){_split(all);window.receitas=all.filter(function(x){return String(x.id||'').charAt(0)==='r';});};
   function mesSel(){var g=$('gMes');var v=g?g.value:'';return v||hojeMes();}
-  function doMes(m){return window.receitas.filter(function(r){return r.rec==='m'?r.mes<=m:r.mes===m;});}
+  function doMes(m){return window.receitas.filter(function(r){return r.rec==='m'?r.mes<=m:(r.rec==='t'?(r.mes<=m&&(!r.ate||m<=r.ate)):r.mes===m);});}
+  window.receitasAtivas=function(m){return doMes(m);};
   window.extraRenda=function(){var t=0;doMes(mesSel()).forEach(function(r){t+=+r.valor||0;});return t;};
+  window.extraRendaEm=function(m){var t=0;doMes(m).forEach(function(r){t+=+r.valor||0;});return t;};
   var ref=$('renda');if(!ref)return;
   var base=ref.closest('.card');
   var card=document.createElement('div');card.className='card';card.id='cardReceitas';
@@ -14,12 +16,13 @@
    +'<div class="form" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">'
    +'<label>Descrição<input type="text" id="rcDesc" maxlength="40" placeholder="Ex.: Aluguel, Férias"></label>'
    +'<label>Valor (R$)<input type="number" id="rcValor" min="0" step="10"></label>'
-   +'<label>Tipo<select id="rcRec"><option value="m">Todo mês (a partir do mês)</option><option value="u">Só uma vez</option></select></label>'
-   +'<label>Mês<input type="month" id="rcMes"></label></div>'
+   +'<label>Tipo<select id="rcRec"><option value="m">Todo mês (a partir do mês)</option><option value="u">Só uma vez</option><option value="t">Temporária (de / até)</option></select></label>'
+   +'<label>Mês (início)<input type="month" id="rcMes"></label><label id="rcAteL" style="display:none">Até o mês<input type="month" id="rcAte"></label></div>'
    +'<button class="btn" id="btRc" type="button">Adicionar receita</button><span class="msg" id="rcMsg"></span>'
    +'<div id="rcLista" style="margin-top:12px"></div><div id="rcTotal" class="note" style="margin-top:8px"></div>';
   base.parentNode.insertBefore(card,base.nextSibling);
   $('rcMes').value=hojeMes();
+  $('rcRec').onchange=function(){$('rcAteL').style.display=this.value==='t'?'':'none';};
   function brl(x){return brl2(x);}
   function mlabel(m){return mesLabel(m);}
   function desenhar(){
@@ -27,7 +30,7 @@
     lista.sort(function(a,b){return String(a.mes).localeCompare(String(b.mes));}).forEach(function(r){
       t+=+r.valor||0;
       var row=document.createElement('div');row.className='item';
-      var a=document.createElement('span');a.textContent=r.desc+' · '+(r.rec==='m'?'todo mês desde '+mlabel(r.mes):'única em '+mlabel(r.mes));
+      var a=document.createElement('span');a.textContent=r.desc+' · '+(r.rec==='m'?'todo mês desde '+mlabel(r.mes):(r.rec==='t'?'temporária: '+mlabel(r.mes)+' até '+mlabel(r.ate):'única em '+mlabel(r.mes)));
       var b=document.createElement('span');b.textContent='+ '+brl(r.valor);b.style.color='var(--pos)';
       var x=document.createElement('button');x.className='x';x.type='button';x.textContent='✕';x.setAttribute('aria-label','Excluir '+r.desc);x.onclick=function(){delDoc(r.id);};
       row.appendChild(a);row.appendChild(b);row.appendChild(x);L.appendChild(row);
@@ -38,7 +41,9 @@
   $('btRc').onclick=async function(){
     var msg=$('rcMsg'),d=$('rcDesc').value.trim(),v=+$('rcValor').value,mes=$('rcMes').value;
     if(!d||!(v>0)||!mes){msg.className='msg err';msg.textContent='Informe descrição, valor e mês.';return;}
-    try{await saveDoc({id:'r'+Date.now(),desc:d.slice(0,40),valor:r2(v),rec:$('rcRec').value,mes:mes});
+    var ate=$('rcRec').value==='t'?$('rcAte').value:'';
+    if($('rcRec').value==='t'&&(!ate||ate<mes)){msg.className='msg err';msg.textContent='Informe o mês final (igual ou depois do início).';return;}
+    try{await saveDoc({id:'r'+Date.now(),desc:d.slice(0,40),valor:r2(v),rec:$('rcRec').value,mes:mes,ate:ate});
       msg.className='msg';msg.textContent='Receita adicionada.';$('rcDesc').value='';$('rcValor').value='';
     }catch(e){msg.className='msg err';msg.textContent='Não consegui salvar. Tente de novo.';}
   };

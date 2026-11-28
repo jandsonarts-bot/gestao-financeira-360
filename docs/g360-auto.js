@@ -109,7 +109,7 @@
       box.innerHTML='<div class="dc"><h3>Para onde vai o dinheiro</h3><div class="cv"><canvas id="dcPizza"></canvas></div></div>'
         +'<div class="dc"><h3>Parcelas em andamento</h3><div id="dcParc"></div></div>'
         +'<div class="dc"><h3>Dinheiro acumulado</h3><div class="cv"><canvas id="dcLinha"></canvas></div></div>';
-      M.parentNode.insertBefore(box,M.nextSibling);
+      M.parentNode.insertBefore(box,($('hmRend')||M).nextSibling);
     }
     var tx=getComputedStyle(document.body).getPropertyValue('--tx2').trim()||'#8fa6c9';
     var lab=[],dat=[],atual=0;
@@ -134,8 +134,9 @@
     if(ex.length){var tt2=document.createElement('div');tt2.style.cssText='font-size:13px;margin-top:4px';tt2.textContent='Em parcelas: '+brl0(mes)+' por mês · ainda a pagar '+brl0(rest);P.appendChild(tt2);}
     else{var nt=document.createElement('div');nt.className='note';nt.textContent='Toque em uma compra (Perfume, Shopee…) e informe a parcela atual e o total.';P.appendChild(nt);}
     var renda=(+($('renda')||{}).value||0)+(window.extraRenda?window.extraRenda():0),taxa=(+($('taxa')||{}).value||0)/100,meses=+($('meses')||{}).value||12;
-    var ap=Math.max(renda-atual,0),sd=0,xs=[],ys=[];
-    for(var m=0;m<=meses;m++){xs.push(m);ys.push(Math.round(sd));sd=sd*(1+taxa)+ap;}
+    var fx=+($('renda')||{}).value||0,m0=($('gMes')||{}).value||(window.hojeMes?hojeMes():''),sd=0,xs=[],ys=[];
+    function addm(s,k){var p=String(s).split('-'),d=new Date(+p[0],+p[1]-1+k,1);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2);}
+    for(var m=0;m<=meses;m++){xs.push(m);ys.push(Math.round(sd));var inc=fx+(window.extraRendaEm&&m0?extraRendaEm(addm(m0,m)):(window.extraRenda?extraRenda():0));sd=sd*(1+taxa)+Math.max(inc-atual,0);}
     var s2=JSON.stringify([ys,tx]);
     if(s2!==sigL){
       sigL=s2;if(ln){ln.destroy();ln=null;}
@@ -340,4 +341,56 @@
     box.appendChild(nt);
   }
   setInterval(function(){try{montar();}catch(e){}},700);
+})();
+(function(){
+  function $(i){return document.getElementById(i);}
+  var css=document.createElement('style');
+  css.textContent='#hmRend{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:12px 14px;margin-bottom:10px}#hmRend h3{margin:0 0 6px;font-size:14px}'+
+    '#hmRend label{display:block;font-size:12px;color:var(--tx2);margin-top:8px}#hmRend input,#hmRend select{width:100%;box-sizing:border-box}'+
+    '#hmRend .it{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;margin:4px 0}#hmRend .it b{color:var(--pos)}';
+  document.head.appendChild(css);
+  function mes(){var g=$('gMes');return (g&&g.value)||(window.hojeMes?hojeMes():'');}
+  function lab(m){return window.mesLabel?mesLabel(m):m;}
+  function montar(){
+    var M=$('hmMet');if(!M||$('hmRend'))return;
+    var b=document.createElement('div');b.id='hmRend';
+    b.innerHTML='<h3>Rendas</h3><div id="rdRes" class="note"></div><div id="rdLista"></div><button type="button" class="btn" id="rdBt" style="width:100%;margin-top:8px">+ Renda temporária</button>'
+     +'<div id="rdForm" style="display:none"><label>Descrição<input type="text" id="rdDesc" maxlength="40" placeholder="Ex.: Freela, Férias"></label>'
+     +'<label>Valor (R$)<input type="number" id="rdValor" min="0" step="10"></label>'
+     +'<label>Tipo<select id="rdTipo"><option value="t">Temporária (de / até)</option><option value="u">Só uma vez</option><option value="m">Todo mês (sem fim)</option></select></label>'
+     +'<label>Mês de início<input type="month" id="rdDe"></label><label id="rdAteL">Até o mês<input type="month" id="rdAte"></label>'
+     +'<div style="display:flex;gap:8px;margin-top:12px"><button type="button" class="btn" id="rdSalvar">Salvar</button><button type="button" class="btn sec" id="rdCancelar">Cancelar</button></div><span class="msg" id="rdMsg"></span></div>';
+    M.parentNode.insertBefore(b,M.nextSibling);
+    $('rdDe').value=window.hojeMes?hojeMes():'';
+    $('rdTipo').onchange=function(){$('rdAteL').style.display=this.value==='t'?'':'none';};
+    $('rdBt').onclick=function(){var f=$('rdForm');f.style.display=f.style.display==='none'?'':'none';};
+    $('rdCancelar').onclick=function(){$('rdForm').style.display='none';};
+    $('rdSalvar').onclick=async function(){
+      var m=$('rdMsg'),d=$('rdDesc').value.trim(),v=+$('rdValor').value,tp=$('rdTipo').value,de=$('rdDe').value,ate=tp==='t'?$('rdAte').value:'';
+      if(!d||!(v>0)||!de){m.className='msg err';m.textContent='Informe descrição, valor e mês de início.';return;}
+      if(tp==='t'&&(!ate||ate<de)){m.className='msg err';m.textContent='Informe o mês final (igual ou depois do início).';return;}
+      try{await saveDoc({id:'r'+Date.now(),desc:d.slice(0,40),valor:r2(v),rec:tp,mes:de,ate:ate});
+        m.className='msg';m.textContent='Renda salva.';$('rdDesc').value='';$('rdValor').value='';$('rdAte').value='';
+        setTimeout(function(){$('rdForm').style.display='none';m.textContent='';},900);
+      }catch(e){m.className='msg err';m.textContent='Não consegui salvar.';}
+    };
+  }
+  function lista(){
+    var L=$('rdLista');if(!L)return;
+    var m=mes(),a=window.receitasAtivas?receitasAtivas(m):[],t=0;
+    a.forEach(function(r){t+=+r.valor||0;});
+    var fx=+($('renda')||{}).value||0;
+    var res='Em '+lab(m)+': renda fixa '+brl2(fx)+' + extras '+brl2(t)+'.';
+    if($('rdRes').textContent!==res)$('rdRes').textContent=res;
+    var sig=JSON.stringify([m,a.map(function(r){return [r.id,r.valor,r.desc,r.ate];})]);
+    if(L._sig===sig)return;L._sig=sig;L.innerHTML='';
+    a.forEach(function(r){
+      var row=document.createElement('div');row.className='it';
+      var s=document.createElement('span');s.textContent=r.desc+(r.rec==='t'?' · até '+lab(r.ate):(r.rec==='m'?' · todo mês':' · só este mês'));
+      var v=document.createElement('b');v.textContent='+ '+brl2(r.valor);
+      var x=document.createElement('button');x.className='x';x.type='button';x.textContent='✕';x.setAttribute('aria-label','Excluir '+r.desc);x.onclick=function(){delDoc(r.id);};
+      row.appendChild(s);row.appendChild(v);row.appendChild(x);L.appendChild(row);
+    });
+  }
+  setInterval(function(){try{montar();lista();}catch(e){}},900);
 })();
