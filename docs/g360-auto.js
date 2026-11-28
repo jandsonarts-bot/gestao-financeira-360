@@ -70,7 +70,7 @@
         ct._pa.addEventListener('input',salvar);ct._pt.addEventListener('input',salvar);ct._inp.addEventListener('input',salvar);
       }
       var N=+ex.parcTotal||0,a=+ex.parcAtual||0;
-      ct._pb.textContent=N>1?('Parcela '+Math.min(a||1,N)+'/'+N+(ex.pagoEm?' · paga em '+ex.pagoEm.slice(8,10)+'/'+ex.pagoEm.slice(5,7):'')):'Toque para informar as parcelas';
+      ct._pb.textContent=N>1?('Parcela '+Math.min(a||1,N)+'/'+N+(ex.pagoEm?' · paga em '+ex.pagoEm.slice(8,10)+'/'+ex.pagoEm.slice(5,7):'')):'';
       if(document.activeElement!==ct._pa)ct._pa.value=ex.parcAtual||'';
       if(document.activeElement!==ct._pt)ct._pt.value=ex.parcTotal||'';
     });
@@ -303,4 +303,41 @@
   try{window.renderTudo();}catch(e){}
   function ciclo2(){try{montarNovo();sugestao();realce();montarPdf();}catch(e){}}
   setInterval(ciclo2,900);setTimeout(ciclo2,1600);
+})();
+(function(){
+  function $(i){return document.getElementById(i);}
+  var M=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  var ano=new Date().getFullYear();
+  function p2(n){return ('0'+n).slice(-2);}
+  function atual(){var v=($('gMes')||{}).value;return /^\d{4}-\d{2}$/.test(v)?v:'';}
+  function setMes(v){
+    var s=$('gMes');if(!s)return;
+    if(v&&!Array.prototype.some.call(s.options,function(o){return o.value===v;})){var o=document.createElement('option');o.value=v;o.textContent=v.slice(5)+'/'+v.slice(0,4);s.appendChild(o);}
+    s.value=v;s.dispatchEvent(new Event('change',{bubbles:true}));
+  }
+  function montar(){
+    var t=$('tab-agenda');if(!t)return;
+    var box=$('agMeses');
+    if(!box){box=document.createElement('div');box.id='agMeses';box.className='card';t.insertBefore(box,t.firstChild);}
+    var cur=atual(),sig=cur+'|'+ano;
+    if(box._sig===sig)return;box._sig=sig;
+    box.innerHTML='';
+    var top=document.createElement('div');top.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:8px';
+    var a=document.createElement('button');a.type='button';a.className='btn sec';a.textContent='‹';a.setAttribute('aria-label','Ano anterior');a.onclick=function(){ano--;box._sig='';montar();};
+    var y=document.createElement('b');y.textContent=ano;y.style.flex='1';y.style.textAlign='center';
+    var n=document.createElement('button');n.type='button';n.className='btn sec';n.textContent='›';n.setAttribute('aria-label','Próximo ano');n.onclick=function(){ano++;box._sig='';montar();};
+    var td=document.createElement('button');td.type='button';td.className='btn sec';td.textContent=cur?'Ver tudo':'Mostrando tudo';td.onclick=function(){setMes('');};
+    top.appendChild(a);top.appendChild(y);top.appendChild(n);top.appendChild(td);box.appendChild(top);
+    var row=document.createElement('div');row.style.cssText='display:flex;flex-wrap:wrap;gap:6px';
+    M.forEach(function(nm,i){
+      var v=ano+'-'+p2(i+1),b=document.createElement('button');b.type='button';b.textContent=nm;
+      b.className=(cur===v)?'btn':'btn sec';b.style.cssText='padding:6px 12px;border-radius:999px';
+      b.onclick=function(){setMes(v);};row.appendChild(b);
+    });
+    box.appendChild(row);
+    var nt=document.createElement('div');nt.className='note';nt.style.marginTop='8px';
+    nt.textContent=cur?'Mostrando os pagamentos de '+cur.slice(5)+'/'+cur.slice(0,4)+'.':'Mostrando os próximos pagamentos. Escolha um mês para filtrar.';
+    box.appendChild(nt);
+  }
+  setInterval(function(){try{montar();}catch(e){}},700);
 })();
