@@ -11,7 +11,8 @@
    +'<label>Conta<input type="text" id="agDesc" maxlength="40" placeholder="Ex.: Aluguel, Cartão"></label>'
    +'<label>Valor (R$)<input type="number" id="agValor" min="0" step="0.01"></label>'
    +'<label>Vencimento<input type="date" id="agVenc"></label>'
-   +'<label>Repete<select id="agRec"><option value="m">Todo mês</option><option value="u">Só uma vez</option></select></label></div>'
+   +'<label>Tipo<select id="agRec"><option value="m">Fixo (todo mês)</option><option value="p">Parcelado</option><option value="u">Avulso (uma vez)</option></select></label>'
+   +'<label id="agPL" style="display:none">Nº de parcelas<input type="number" id="agParc" min="2" max="60" step="1" placeholder="Ex.: 10"></label></div>'
    +'<button class="btn" id="btAg" type="button">Adicionar à agenda</button><span class="msg" id="agMsg"></span></div>'
    +'<div class="card"><h2>Próximos vencimentos</h2><div id="agLista"></div>'
    +'<div style="margin-top:10px"><button class="btn sec" id="btNotif" type="button">Ativar avisos neste aparelho</button><span class="msg" id="ntMsg"></span></div></div>';
@@ -20,10 +21,23 @@
   function iso(d){return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());}
   function dbr(s){var p=s.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
   $('agVenc').value=iso(new Date());
+  $('agRec').addEventListener('change',function(){$('agPL').style.display=this.value==='p'?'':'none';});
   function ocorr(a){
     var out=[],h=new Date();h.setHours(0,0,0,0);
     var p=a.venc.split('-'),y0=+p[0],m0=+p[1]-1,d0=+p[2],pagos=a.pagos||{};
     if(a.rec==='u'){out.push({a:a,key:a.venc,data:new Date(y0,m0,d0),pago:!!pagos[a.venc]});return out;}
+    if(a.rec==='p'){
+      var N=+a.parcelas||1;
+      for(var i=0;i<N;i++){
+        var ms=new Date(y0,m0+i,1),ul=new Date(ms.getFullYear(),ms.getMonth()+1,0).getDate();
+        var dd=new Date(ms.getFullYear(),ms.getMonth(),Math.min(d0,ul));
+        var kk=ms.getFullYear()+'-'+p2(ms.getMonth()+1);
+        var dias=Math.round((dd-h)/86400000);
+        if(dias<-62||dias>35)continue;
+        out.push({a:a,key:kk,data:dd,pago:!!pagos[kk],n:i+1,N:N});
+      }
+      return out;
+    }
     var ini=new Date(Math.max(new Date(y0,m0,1).getTime(),new Date(h.getFullYear(),h.getMonth()-2,1).getTime()));
     for(var k=0;k<4;k++){
       var y=ini.getFullYear(),m=ini.getMonth()+k+0;
@@ -56,7 +70,7 @@
     var p=a.venc.split('-'),ds=p[0]+p[1]+p[2];
     var L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Gestao 360//PT','BEGIN:VEVENT','UID:'+a.id+'@gestao360','DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').slice(0,15)+'Z',
       'DTSTART:'+ds+'T090000','DTEND:'+ds+'T093000','SUMMARY:Pagar '+a.desc+' (R$ '+(+a.valor||0).toFixed(2).replace('.',',')+')'];
-    if(a.rec==='m')L.push('RRULE:FREQ=MONTHLY');
+    if(a.rec==='m')L.push('RRULE:FREQ=MONTHLY');if(a.rec==='p')L.push('RRULE:FREQ=MONTHLY;COUNT='+(+a.parcelas||1));
     ['-P3D','-P1D','PT0S'].forEach(function(t){L.push('BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:Pagar '+a.desc,'TRIGGER:'+t,'END:VALARM');});
     L.push('END:VEVENT','END:VCALENDAR');
     var blob=new Blob([L.join('\r\n')],{type:'text/calendar'}),u=URL.createObjectURL(blob),x=document.createElement('a');
@@ -68,10 +82,18 @@
     var h=new Date();h.setHours(0,0,0,0);
     var lista=todas().filter(function(o){return !o.pago||o.dias>=-3;});
     if(!lista.length){L.innerHTML='<div class="note">Nenhuma conta cadastrada ainda.</div>';}
-    lista.forEach(function(o){
+    var grupos=[['m','Pagamentos fixos'],['p','Parcelados'],['u','Avulsos']];
+    var ordem=[];
+    grupos.forEach(function(g){
+      var sub=lista.filter(function(o){return o.a.rec===g[0];});
+      if(!sub.length)return;
+      ordem.push({tit:g[1]});sub.forEach(function(o){ordem.push(o);});
+    });
+    ordem.forEach(function(o){
+      if(o.tit){var hd=document.createElement('div');hd.textContent=o.tit;hd.style.cssText='font-weight:700;font-size:14px;margin:14px 0 6px;color:var(--ac)';L.appendChild(hd);return;}
       var st=status(o),a=o.a;
       var row=document.createElement('div');row.className='item';row.style.flexWrap='wrap';
-      var t=document.createElement('span');t.style.flex='1 1 160px';t.textContent=a.desc+' · '+dbr(iso(o.data));
+      var t=document.createElement('span');t.style.flex='1 1 160px';t.textContent=a.desc+(o.N?' · parcela '+o.n+'/'+o.N:'')+' · '+dbr(iso(o.data));
       var v=document.createElement('span');v.textContent=brl2(a.valor);
       var s=document.createElement('span');s.textContent=st[0];s.style.cssText='font-weight:700;color:'+st[1];
       row.appendChild(t);row.appendChild(v);row.appendChild(s);
@@ -97,10 +119,11 @@
     f.innerHTML='<b>Agenda:</b> '+urg.length+(urg.length===1?' pagamento perto do vencimento':' pagamentos perto do vencimento')+(atr?' ('+atr+' atrasado'+(atr>1?'s':'')+')':'')+(hoje?' · '+hoje+' vence hoje':'')+'. Toque para ver.';
   }
   $('btAg').onclick=async function(){
-    var m=$('agMsg'),d=$('agDesc').value.trim(),v=+$('agValor').value,dt=$('agVenc').value;
+    var m=$('agMsg'),d=$('agDesc').value.trim(),v=+$('agValor').value,dt=$('agVenc').value,rc=$('agRec').value,np=+$('agParc').value;
     if(!d||!(v>0)||!dt){m.className='msg err';m.textContent='Informe conta, valor e vencimento.';return;}
-    try{await saveDoc({id:'a'+Date.now(),desc:d.slice(0,40),valor:r2(v),venc:dt,rec:$('agRec').value,pagos:{}});
-      m.className='msg';m.textContent='Adicionado à agenda.';$('agDesc').value='';$('agValor').value='';
+    if(rc==='p'&&!(np>=2)){m.className='msg err';m.textContent='Informe o número de parcelas (2 ou mais).';return;}
+    try{var ob={id:'a'+Date.now(),desc:d.slice(0,40),valor:r2(v),venc:dt,rec:rc,pagos:{}};if(rc==='p')ob.parcelas=Math.round(np);await saveDoc(ob);
+      m.className='msg';m.textContent='Adicionado à agenda.';$('agDesc').value='';$('agValor').value='';$('agParc').value='';
     }catch(e){m.className='msg err';m.textContent='Não consegui salvar. Tente de novo.';}
   };
   var reg=null;

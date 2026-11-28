@@ -32,4 +32,20 @@
     if(!pronto)return;
     clearTimeout(t);t=setTimeout(guardar,1200);
   });
+  var todas=false;
+  function filtrar(){
+    var H=$('hmCats');if(!H)return;
+    var vazias=0;
+    Array.prototype.forEach.call(H.children,function(ct){
+      if(!ct._num)return;
+      var z=!(+ct._num.value>0);if(z)vazias++;
+      ct.style.display=(z&&!todas&&!ct.classList.contains('open'))?'none':'';
+    });
+    var b=$('hmToggle');
+    if(!b){b=document.createElement('button');b.id='hmToggle';b.type='button';b.className='btn sec';b.style.cssText='margin-top:10px;width:100%';
+      b.onclick=function(){todas=!todas;filtrar();};H.parentNode.insertBefore(b,H.nextSibling);}
+    b.style.display=(vazias||todas)?'':'none';
+    b.textContent=todas?'Ocultar categorias sem valor':'Mostrar categorias sem valor ('+vazias+')';
+  }
+  setInterval(filtrar,600);
 })();
