@@ -22,8 +22,10 @@
   function dbr(s){var p=s.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
   $('agVenc').value=iso(new Date());
   $('agRec').addEventListener('change',function(){$('agPL').style.display=this.value==='p'?'':'none';});
-  function ocorr(a){
-    var out=[],h=new Date();h.setHours(0,0,0,0);
+  function mesSel(){var v=($('gMes')||{}).value;return /^\d{4}-\d{2}$/.test(v)?v:'';}
+  document.addEventListener('change',function(e){if(e.target&&e.target.id==='gMes')desenhar();});
+  function ocorr(a,ign){
+    var out=[],h=new Date(),ms0=ign?'':mesSel();h.setHours(0,0,0,0);
     var p=a.venc.split('-'),y0=+p[0],m0=+p[1]-1,d0=+p[2],pagos=a.pagos||{};
     if(a.rec==='u'){out.push({a:a,key:a.venc,data:new Date(y0,m0,d0),pago:!!pagos[a.venc]});return out;}
     if(a.rec==='p'){
@@ -33,11 +35,12 @@
         var dd=new Date(ms.getFullYear(),ms.getMonth(),Math.min(d0,ul));
         var kk=ms.getFullYear()+'-'+p2(ms.getMonth()+1);
         var dias=Math.round((dd-h)/86400000);
-        if(dias<-62||dias>35)continue;
+        if(ms0?kk!==ms0:(dias<-62||dias>35))continue;
         out.push({a:a,key:kk,data:dd,pago:!!pagos[kk],n:i+1,N:N});
       }
       return out;
     }
+    if(ms0){var pm=ms0.split('-'),yy=+pm[0],mm=+pm[1]-1,ul0=new Date(yy,mm+1,0).getDate(),dm=new Date(yy,mm,Math.min(d0,ul0));if(dm>=new Date(y0,m0,d0))out.push({a:a,key:ms0,data:dm,pago:!!pagos[ms0]});return out;}
     var ini=new Date(Math.max(new Date(y0,m0,1).getTime(),new Date(h.getFullYear(),h.getMonth()-2,1).getTime()));
     for(var k=0;k<4;k++){
       var y=ini.getFullYear(),m=ini.getMonth()+k+0;
@@ -51,12 +54,13 @@
     }
     return out;
   }
-  function todas(){
+  function todas(ign){
     var h=new Date();h.setHours(0,0,0,0);
     var r=[];
-    window.agenda.forEach(function(a){ocorr(a).forEach(function(o){
+    window.agenda.forEach(function(a){ocorr(a,ign).forEach(function(o){
       o.dias=Math.round((o.data-h)/86400000);r.push(o);
     });});
+    var ms=ign?'':mesSel();if(ms)r=r.filter(function(o){return iso(o.data).slice(0,7)===ms;});
     return r.sort(function(x,y){return x.data-y.data;});
   }
   function status(o){
@@ -80,8 +84,8 @@
   function desenhar(){
     var L=$('agLista');if(!L)return;L.innerHTML='';
     var h=new Date();h.setHours(0,0,0,0);
-    var lista=todas().filter(function(o){return !o.pago||o.dias>=-3;});
-    if(!lista.length){L.innerHTML='<div class="note">Nenhuma conta cadastrada ainda.</div>';}
+    var ms=mesSel();var lista=todas().filter(function(o){return ms||!o.pago||o.dias>=-3;});
+    if(!lista.length){L.innerHTML='<div class="note">'+(ms?'Nenhuma conta neste mês.':'Nenhuma conta cadastrada ainda.')+'</div>';}
     var grupos=[['m','Pagamentos fixos'],['p','Parcelados'],['u','Avulsos']];
     var ordem=[];
     grupos.forEach(function(g){
@@ -112,7 +116,7 @@
   function faixa(){
     var ref=$('tab-sim');if(!ref)return;
     var f=$('g360AgFaixa');
-    var urg=todas().filter(function(o){return !o.pago&&o.dias<=3;});
+    var urg=todas(true).filter(function(o){return !o.pago&&o.dias<=3;});
     if(!urg.length){if(f)f.remove();return;}
     if(!f){f=document.createElement('div');f.id='g360AgFaixa';f.className='card';f.style.cssText='cursor:pointer;border-color:#d9822b';f.onclick=function(){window.tab('agenda');};ref.insertBefore(f,ref.firstChild);}
     var atr=urg.filter(function(o){return o.dias<0;}).length,hoje=urg.filter(function(o){return o.dias===0;}).length;
@@ -149,7 +153,7 @@
     if(!('Notification' in window)||Notification.permission!=='granted')return;
     var hoje=iso(new Date()),vis={};
     try{vis=JSON.parse(localStorage.getItem('g360_avisos')||'{}');}catch(e){}
-    todas().forEach(function(o){
+    todas(true).forEach(function(o){
       if(o.pago)return;
       if(!(o.dias<=3&&o.dias>=-3))return;
       var k=o.a.id+'|'+o.key+'|'+hoje;if(vis[k])return;vis[k]=1;

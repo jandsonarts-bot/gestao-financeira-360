@@ -70,7 +70,7 @@
         ct._pa.addEventListener('input',salvar);ct._pt.addEventListener('input',salvar);ct._inp.addEventListener('input',salvar);
       }
       var N=+ex.parcTotal||0,a=+ex.parcAtual||0;
-      ct._pb.textContent=N>1?('Parcela '+Math.min(a||1,N)+'/'+N):'Toque para informar as parcelas';
+      ct._pb.textContent=N>1?('Parcela '+Math.min(a||1,N)+'/'+N+(ex.pagoEm?' · paga em '+ex.pagoEm.slice(8,10)+'/'+ex.pagoEm.slice(5,7):'')):'Toque para informar as parcelas';
       if(document.activeElement!==ct._pa)ct._pa.value=ex.parcAtual||'';
       if(document.activeElement!==ct._pt)ct._pt.value=ex.parcTotal||'';
     });
@@ -88,7 +88,7 @@
     var vazias=0;
     Array.prototype.forEach.call(H.children,function(ct){
       if(!ct._num||ct._head)return;
-      var z=!(+ct._num.value>0);if(z)vazias++;
+      var z=!(+ct._num.value>0)&&ct._idx===undefined;if(z)vazias++;
       ct.style.display=(z&&!todas&&!ct.classList.contains('open'))?'none':'';
     });
     var b=$('hmToggle');
@@ -146,4 +146,161 @@
   function ciclo(){try{zerarCortes();organizar();filtrar();dash();}catch(e){}}
   setInterval(ciclo,800);
   setTimeout(ciclo,1500);
+})();
+(function(){
+  function $(i){return document.getElementById(i);}
+  var t0=Date.now();
+  var ICONES=['💳','🍽️','🚗','⚡','💧','🛒','🛍️','🏠','📱','🎓','💊','🐶','🎁','🧴','✈️','⛽','📦','🍔','🎮','🏦'];
+  var SUG=[{nome:'Cartão Alexandre',valor:454.2,icone:'💳',parcAtual:1,parcTotal:6,pagoEm:'2026-11-23'},{nome:'Cantina Antonella',valor:0,icone:'🍽️'},{nome:'Uber',valor:0,icone:'🚗'},{nome:'Água',valor:0,icone:'💧'},{nome:'Energia',valor:0,icone:'⚡'}];
+  var css=document.createElement('style');
+  css.textContent='#hmNovoW{margin-top:12px}#hmNovo,#hmSug{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:12px 14px;margin-top:10px}'+
+    '#hmSug{border-style:dashed;border-color:var(--ac);font-size:13px}#hmSug .bt{display:flex;gap:8px;margin-top:8px}'+
+    '#hmNovo label{display:block;font-size:12px;color:var(--tx2);margin-top:8px}#hmNovo input,#hmNovo select{width:100%;box-sizing:border-box}'+
+    '.icg{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.icg button{font-size:20px;line-height:1;padding:6px 8px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);cursor:pointer}.icg button.on{border-color:var(--ac);box-shadow:0 0 0 2px var(--ac)}'+
+    '#hmNovo .qk{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}#hmCats .em{font-size:15px;line-height:1}#cardPdf .item{display:flex;align-items:center;gap:8px;justify-content:space-between}';
+  document.head.appendChild(css);
+  function ex(){return window.extras||[];}
+  function falta(){return SUG.filter(function(s){return !ex().some(function(e){return String(e.nome||'').toLowerCase()===s.nome.toLowerCase();});});}
+  function flag(){try{return localStorage.getItem('g360_sug17')==='1';}catch(e){return false;}}
+  function setFlag(){try{localStorage.setItem('g360_sug17','1');}catch(e){}}
+  var icSel='🏷️';
+  function iconGrid(el,onPick){
+    el.innerHTML='';
+    ICONES.forEach(function(ic){var b=document.createElement('button');b.type='button';b.textContent=ic;
+      b.onclick=function(e){e.stopPropagation();onPick(ic);};el.appendChild(b);});
+  }
+  function montarNovo(){
+    var H=$('hmCats');if(!H||$('hmNovoW'))return;
+    var w=document.createElement('div');w.id='hmNovoW';
+    w.innerHTML='<button type="button" class="btn" id="hmNovoBt" style="width:100%">+ Novo pagamento</button><div id="hmSug" style="display:none"></div><div id="hmNovo" style="display:none">'
+     +'<b>Novo pagamento</b>'
+     +'<div class="qk" id="nvQk"></div>'
+     +'<label>Nome<input type="text" id="nvNome" maxlength="30" placeholder="Ex.: Cartão Alexandre"></label>'
+     +'<label>Valor (R$)<input type="number" id="nvValor" min="0" step="0.01"></label>'
+     +'<label>Tipo<select id="nvTipo"><option value="u">Mensal ou avulso</option><option value="p">Parcelado</option></select></label>'
+     +'<div id="nvPar" style="display:none"><label>Total de parcelas<input type="number" id="nvTotal" min="2" step="1"></label>'
+     +'<label>Parcelas já pagas<input type="number" id="nvPagas" min="0" step="1"></label>'
+     +'<label>Data da última parcela paga<input type="date" id="nvData"></label></div>'
+     +'<label>Figurinha</label><div class="icg" id="nvIcons"></div>'
+     +'<div style="display:flex;gap:8px;margin-top:12px"><button type="button" class="btn" id="nvSalvar">Salvar</button><button type="button" class="btn sec" id="nvCancelar">Cancelar</button></div><span class="msg" id="nvMsg"></span></div>';
+    H.parentNode.insertBefore(w,H.nextSibling);
+    var g=$('nvIcons');
+    function marcar(){Array.prototype.forEach.call(g.children,function(b){b.className=b.textContent===icSel?'on':'';});}
+    iconGrid(g,function(ic){icSel=ic;marcar();});marcar();
+    $('nvTipo').onchange=function(){$('nvPar').style.display=this.value==='p'?'':'none';};
+    var qk=$('nvQk');
+    SUG.forEach(function(s){var b=document.createElement('button');b.type='button';b.className='btn sec';b.style.cssText='padding:4px 10px;font-size:12px';b.textContent=s.icone+' '+s.nome;
+      b.onclick=function(){$('nvNome').value=s.nome;$('nvValor').value=s.valor||'';icSel=s.icone;marcar();
+        $('nvTipo').value=s.parcTotal?'p':'u';$('nvPar').style.display=s.parcTotal?'':'none';
+        $('nvTotal').value=s.parcTotal||'';$('nvPagas').value=s.parcAtual||'';$('nvData').value=s.pagoEm||'';};qk.appendChild(b);});
+    $('hmNovoBt').onclick=function(){var f=$('hmNovo');f.style.display=f.style.display==='none'?'':'none';};
+    $('nvCancelar').onclick=function(){$('hmNovo').style.display='none';};
+    $('nvSalvar').onclick=async function(){
+      var m=$('nvMsg'),n=$('nvNome').value.trim(),v=+$('nvValor').value||0;
+      if(!n){m.className='msg err';m.textContent='Informe o nome.';return;}
+      var o={id:'x'+Date.now(),nome:n.slice(0,30),valor:r2(v),icone:icSel};
+      if($('nvTipo').value==='p'){
+        var T=Math.round(+$('nvTotal').value||0),P=Math.round(+$('nvPagas').value||0);
+        if(T<2){m.className='msg err';m.textContent='Informe o total de parcelas.';return;}
+        o.parcTotal=T;o.parcAtual=Math.min(Math.max(P,0),T);
+        if($('nvData').value)o.pagoEm=$('nvData').value;
+      }
+      try{await saveDoc(o);m.className='msg';m.textContent='Pagamento salvo.';
+        $('nvNome').value='';$('nvValor').value='';$('nvTotal').value='';$('nvPagas').value='';$('nvData').value='';
+        setTimeout(function(){$('hmNovo').style.display='none';m.textContent='';},900);
+      }catch(e){m.className='msg err';m.textContent='Não consegui salvar.';}
+    };
+    $('hmSug').addEventListener('click',async function(e){
+      var id=e.target&&e.target.id;
+      if(id==='sugNao'){setFlag();$('hmSug').style.display='none';}
+      if(id==='sugSim'){
+        var f=falta(),k=0;
+        for(var i=0;i<f.length;i++){await saveDoc(Object.assign({id:'x'+(Date.now()+i)},f[i]));k++;}
+        setFlag();$('hmSug').style.display='none';
+      }
+    });
+  }
+  function sugestao(){
+    var s=$('hmSug');if(!s)return;
+    var f=falta();
+    var mostrar=!flag()&&f.length>0&&Date.now()-t0>5000;
+    s.style.display=mostrar?'':'none';
+    if(mostrar&&!s._ok){
+      s._ok=1;
+      s.innerHTML='<b>Adicionar sugestões?</b><div style="margin-top:4px">Cartão Alexandre (6 parcelas de R$ 454,20, 1 paga em 23/11), Cantina Antonella, Uber, Água e Energia.</div><div class="bt"><button type="button" class="btn" id="sugSim">Adicionar</button><button type="button" class="btn sec" id="sugNao">Agora não</button></div>';
+    }
+  }
+  function realce(){
+    var H=$('hmCats');if(!H)return;
+    Array.prototype.forEach.call(H.children,function(ct){
+      if(ct._idx===undefined||ct._head)return;
+      var e=ex()[ct._idx];if(!e)return;
+      var n=ct.querySelector('.n');if(!n)return;
+      var em=n.querySelector('.em');
+      if(!em){em=document.createElement('b');em.className='em';n.insertBefore(em,n.firstChild);var sv=n.querySelector('svg');if(sv)sv.style.display='none';}
+      em.textContent=e.icone||'🏷️';
+      if(!ct._ic){
+        var ed=ct.querySelector('.ed'),okb=ed&&ed.querySelector(':scope>button');
+        if(!ed||!okb)return;
+        ct._ic=1;
+        var box=document.createElement('div');box.innerHTML='<small style="display:block;margin-top:8px;color:var(--tx2)">Figurinha</small>';
+        var g=document.createElement('div');g.className='icg';
+        iconGrid(g,function(ic){var e2=ex()[ct._idx];if(e2)saveDoc(Object.assign({},e2,{icone:ic}));});
+        box.appendChild(g);
+        var del=document.createElement('button');del.type='button';del.className='btn sec';del.textContent='Excluir pagamento';del.style.cssText='margin-top:10px;width:100%';
+        del.onclick=function(ev){ev.stopPropagation();var e2=ex()[ct._idx];if(e2&&confirm('Excluir "'+e2.nome+'"?'))delDoc(e2.id);};
+        ed.insertBefore(box,okb);ed.insertBefore(del,okb);
+      }
+    });
+  }
+  // extratos em PDF
+  var _s=window.splitAll;
+  window.splitAll=function(all){_s(all);window.extratosPdf=all.filter(function(x){return String(x.id||'').charAt(0)==='f'&&x.pdf;});};
+  function mlab(s){var p=String(s||'').split('-');return p.length===2?p[1]+'/'+p[0]:s;}
+  function listaPdf(){
+    var L=$('pdfLista');if(!L)return;L.innerHTML='';
+    (window.extratosPdf||[]).slice().sort(function(a,b){return String(b.mes||'').localeCompare(String(a.mes||''))||String(b.id).localeCompare(String(a.id));}).forEach(function(r){
+      var row=document.createElement('div');row.className='item';
+      var a=document.createElement('span');a.textContent='📄 '+r.desc+(r.mes?' · '+mlab(r.mes):'');
+      var b=document.createElement('button');b.type='button';b.className='btn sec';b.style.cssText='padding:4px 10px;font-size:12px';b.textContent='Abrir';
+      b.onclick=function(){
+        var d=r.pdf,i=d.indexOf(','),bin=atob(d.slice(i+1)),u=new Uint8Array(bin.length);
+        for(var k=0;k<bin.length;k++)u[k]=bin.charCodeAt(k);
+        window.open(URL.createObjectURL(new Blob([u],{type:'application/pdf'})),'_blank');
+      };
+      var x=document.createElement('button');x.className='x';x.type='button';x.textContent='✕';x.setAttribute('aria-label','Excluir '+r.desc);x.onclick=function(){delDoc(r.id);};
+      row.appendChild(a);row.appendChild(b);row.appendChild(x);L.appendChild(row);
+    });
+  }
+  function montarPdf(){
+    if($('cardPdf'))return;var base=$('cardPG');if(!base||!base.parentNode)return;
+    var c=document.createElement('div');c.className='card';c.id='cardPdf';
+    c.innerHTML='<h2>Extratos em PDF</h2><div class="note" style="margin:0 0 10px">Anexe o extrato do banco ou do cartão em PDF (até cerca de 650 KB).</div>'
+     +'<div class="form" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><label>Descrição<input type="text" id="pdfDesc" maxlength="40" placeholder="Ex.: Extrato Nubank"></label>'
+     +'<label>Mês<input type="month" id="pdfMes"></label><label>Arquivo PDF<input type="file" id="pdfArq" accept="application/pdf,.pdf"></label></div>'
+     +'<button class="btn" id="btPdf" type="button" style="margin-top:8px">Salvar extrato</button><span class="msg" id="pdfMsg"></span><div id="pdfLista" style="margin-top:12px"></div>';
+    base.parentNode.insertBefore(c,base.nextSibling);
+    var d=new Date();$('pdfMes').value=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2);
+    $('btPdf').onclick=function(){
+      var m=$('pdfMsg'),f=$('pdfArq').files&&$('pdfArq').files[0],desc=$('pdfDesc').value.trim();
+      if(!desc||!f){m.className='msg err';m.textContent='Informe a descrição e escolha o PDF.';return;}
+      if(!/pdf/i.test(f.type)&&!/\.pdf$/i.test(f.name)){m.className='msg err';m.textContent='O arquivo precisa ser PDF.';return;}
+      var fr=new FileReader();
+      fr.onerror=function(){m.className='msg err';m.textContent='Não consegui ler o arquivo.';};
+      fr.onload=async function(){
+        var data=String(fr.result);
+        if(data.length>900000){m.className='msg err';m.textContent='PDF grande demais (máximo cerca de 650 KB). Comprima o arquivo e tente de novo.';return;}
+        try{await saveDoc({id:'f'+Date.now(),desc:desc.slice(0,40),mes:$('pdfMes').value,nome:f.name.slice(0,60),pdf:data});
+          m.className='msg';m.textContent='Extrato salvo.';$('pdfDesc').value='';$('pdfArq').value='';
+        }catch(e){m.className='msg err';m.textContent='Não consegui salvar. Tente de novo.';}
+      };
+      fr.readAsDataURL(f);
+    };
+    listaPdf();
+  }
+  var _rt=window.renderTudo;
+  window.renderTudo=function(){_rt();try{listaPdf();}catch(e){}};
+  try{window.renderTudo();}catch(e){}
+  function ciclo2(){try{montarNovo();sugestao();realce();montarPdf();}catch(e){}}
+  setInterval(ciclo2,900);setTimeout(ciclo2,1600);
 })();
